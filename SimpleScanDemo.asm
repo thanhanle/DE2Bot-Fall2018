@@ -70,29 +70,33 @@ Main:
 	OUT    CTIMER      ; turn on timer peripheral
 	
 	;;;; Demo code to acquire sonar data during a rotation
-	CLI    &B0010      ; disable the movement API interrupt
-	CALL   AcquireData ; perform a 360 degree scan
+	;CLI    &B0010      ; disable the movement API interrupt
+	;CALL   AcquireData ; perform a 360 degree scan
 	
+	CLI &B0010
+	
+	
+	CALL	Move_Forward_2ft
 	;;;; Demo code to turn to face the closest object seen
 	; Before enabling the movement control code, set it to
 	; not start moving immediately.
-	LOADI  0
-	STORE  DVel        ; zero desired forward velocity
-	IN     THETA
-	STORE  DTheta      ; desired heading = current heading
-	SEI    &B0010      ; enable interrupts from source 2 (timer)
+	;LOADI  0
+	;STORE  DVel        ; zero desired forward velocity
+	;IN     THETA
+	;STORE  DTheta      ; desired heading = current heading
+	;SEI    &B0010      ; enable interrupts from source 2 (timer)
 	; at this point, timer interrupts will be firing at 10Hz, and
 	; code in that ISR will attempt to control the robot.
 	; If you want to take manual control of the robot,
 	; execute CLI &B0010 to disable the timer interrupt.
 
 	; FindClosest returns the angle to the closest object
-	CALL   FindClosest
+	;CALL   FindClosest
 	OUT    SSEG2       ; useful debugging info
 	
 	; To turn to that angle using the movement API, just store
 	; the angle into the "desired theta" variable.
-	STORE  DTheta
+	;STORE  DTheta
 
 InfLoop: 
 	JUMP   InfLoop
@@ -167,7 +171,81 @@ ADStore:
 	OrigTheta: DW 0
 	CurrTheta: DW 0
 	TurnTracker: DW 0
+
 	
+;MAKE_LEFT_AND_FRONT_SAME:
+	;LOADI	DataArray
+	;STORE	ArrayIndex
+	;ILOAD	ArrayIndex
+	;STORE	LeftDistance	; store left distance
+	
+	;LOAD	ArrayIndex
+	;ADD		FrontIndex
+	;STORE	FrontDistance	; stroe front distance
+	
+	; if front distance < left distance : go back
+	;LOAD	FrontDistance
+	;SUB		LeftDistance
+	
+	;LeftIndex:	DW 0
+	;FrontIndex:	DW 270
+	;LeftDistance: DW 0
+	;FrontDistance: DW 0
+	
+		
+Move_Forward_2ft: ; move back until x pos is greater than 2 feet
+	
+	IN	XPOS
+	STORE InitMoveForward_X
+Move_Forward_2ft_cont:	
+	LOAD FSlow
+	OUT RVELCMD
+	OUT LVELCMD
+	IN XPOS
+	SUB InitMoveForward_X ; XPOS - InitX 
+	SUB	Ft2	  ;; XPOS - InitX > 2 feet?
+	JPOS Move_Forward_2ft_return 
+	JUMP Move_Forward_2ft_cont
+Move_Forward_2ft_return:
+	RETURN	
+	InitMoveForward_X: DW 0
+	
+	
+	
+Turn_Around: ; TURN AROUND 90 DEGREE
+	
+	IN     THETA
+	STORE  InitTurnAround_Theta
+	ADD how_much_turn
+	STORE desired_degree
+	
+Turn_Around_cont:	
+	LOAD   Zero
+	OUT	LVELCMD
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	STORE current_theta
+	LOAD desired_degree
+	SUB current_theta ; desired_degree - current_theta
+	JNEG Turn_Around_return
+	JUMP Turn_Around_cont
+	
+Turn_Around_return:
+	RETURN	
+	
+	
+	InitTurnAround_Theta: DW 0
+	current_theta: DW 0
+	desired_degree: DW 0
+	how_much_turn: DW 90
+	
+
+		
+	
+	
+		
 ; FindClosest subroutine will go through the acquired data
 ; and return the angle of the closest sonar reading.
 FindClosest:
