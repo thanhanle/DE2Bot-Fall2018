@@ -75,8 +75,9 @@ Main:
 	
 	CLI &B0010
 	
-	
-	CALL	Move_Forward_2ft
+	CALL Move_Forward_2ft
+	;CALL Turn_Around
+	;CALL	Move_Forward_2ft
 	;;;; Demo code to turn to face the closest object seen
 	; Before enabling the movement control code, set it to
 	; not start moving immediately.
@@ -173,50 +174,63 @@ ADStore:
 	TurnTracker: DW 0
 
 	
-;MAKE_LEFT_AND_FRONT_SAME:
-	;LOADI	DataArray
-	;STORE	ArrayIndex
-	;ILOAD	ArrayIndex
-	;STORE	LeftDistance	; store left distance
 	
-	;LOAD	ArrayIndex
-	;ADD		FrontIndex
-	;STORE	FrontDistance	; stroe front distance
 	
-	; if front distance < left distance : go back
-	;LOAD	FrontDistance
-	;SUB		LeftDistance
-	
-	;LeftIndex:	DW 0
-	;FrontIndex:	DW 270
-	;LeftDistance: DW 0
-	;FrontDistance: DW 0
-	
-		
-Move_Forward_2ft: ; move back until x pos is greater than 2 feet
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EDITED BY JUMONG ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		
+Move_Forward_2ft: ; move back until x pos is greater than 2 feet (COMPLETED)
 	
 	IN	XPOS
 	STORE InitMoveForward_X
-Move_Forward_2ft_cont:	
+	LOAD	Ft2									; <------------------ Change this to alter the collision distance
+	STORE Collision_distance
+	
+	LOAD   Mask2
+	OUT    SONAREN
+	LOAD	Mask3
+	OUT		SONAREN
+Move_Forward_2ft_cont:
+	IN DIST2 ;; checking it is in range of collision_distance
+	SUB Collision_distance  ;if (DIST2 < Collision_distance) -> collision detected
+	JNEG Collision_detected
+	IN DIST3
+	SUB Collision_distance
+	JNEG Collision_detected
+		
 	LOAD FSlow
 	OUT RVELCMD
 	OUT LVELCMD
 	IN XPOS
 	SUB InitMoveForward_X ; XPOS - InitX 
-	SUB	Ft2	  ;; XPOS - InitX > 2 feet?
+	SUB	Ft2	  ;; XPOS - InitX > 2 feet?   <---------------- Change this to alter the distance of moving forward
 	JPOS Move_Forward_2ft_return 
 	JUMP Move_Forward_2ft_cont
+	
+Collision_detected: ;; for now, turn 90 left
+	LOAD Zero
+	OUT LVELCMD
+	LOAD Zero
+	OUT RVELCMD
+	JUMP Move_Forward_2ft_return
+	
+	
 Move_Forward_2ft_return:
 	RETURN	
 	InitMoveForward_X: DW 0
+	Collision_distance: DW 0
 	
 	
 	
-Turn_Around: ; TURN AROUND 90 DEGREE
+Turn_Around: ; (IN PROGRESS)
 	
 	IN     THETA
-	STORE  InitTurnAround_Theta
-	ADD how_much_turn
+	STORE init_theta
+	LOAD Deg90			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn
+	
+	LOAD init_theta
+	ADD how_much_turn				
 	STORE desired_degree
 	
 Turn_Around_cont:	
@@ -235,14 +249,17 @@ Turn_Around_cont:
 Turn_Around_return:
 	RETURN	
 	
-	
-	InitTurnAround_Theta: DW 0
+	init_theta: DW 0
 	current_theta: DW 0
 	desired_degree: DW 0
-	how_much_turn: DW 90
+	how_much_turn: DW 0
 	
-
+	
 		
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EDITED BY JUMONG ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		
 	
 	
 		
