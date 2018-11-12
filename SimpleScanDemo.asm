@@ -75,9 +75,15 @@ Main:
 	
 	CLI &B0010
 	
-	CALL Move_Forward_2ft
-	;CALL Turn_Around
-	;CALL	Move_Forward_2ft
+	LOAD	Ft4
+	STORE how_much_move
+	LOAD	Ft2									; <------------------ Change this to alter the collision distance
+	STORE Collision_distance
+	CALL Move_Forward
+	
+	LOAD Deg90			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn
+	CALL Turn_Around
 	;;;; Demo code to turn to face the closest object seen
 	; Before enabling the movement control code, set it to
 	; not start moving immediately.
@@ -179,21 +185,20 @@ ADStore:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EDITED BY JUMONG ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		
-Move_Forward_2ft: ; move back until x pos is greater than 2 feet (COMPLETED)
+Move_Forward: ; move back until x pos is greater than 2 feet (COMPLETED)
 	
 	IN	XPOS
 	STORE InitMoveForward_X
-	LOAD	Ft2									; <------------------ Change this to alter the collision distance
-	STORE Collision_distance
 	
+	
+Move_Forward_cont:
 	LOAD   Mask2
 	OUT    SONAREN
-	LOAD	Mask3
-	OUT		SONAREN
-Move_Forward_2ft_cont:
 	IN DIST2 ;; checking it is in range of collision_distance
 	SUB Collision_distance  ;if (DIST2 < Collision_distance) -> collision detected
 	JNEG Collision_detected
+	LOAD	Mask3
+	OUT		SONAREN
 	IN DIST3
 	SUB Collision_distance
 	JNEG Collision_detected
@@ -203,22 +208,24 @@ Move_Forward_2ft_cont:
 	OUT LVELCMD
 	IN XPOS
 	SUB InitMoveForward_X ; XPOS - InitX 
-	SUB	Ft2	  ;; XPOS - InitX > 2 feet?   <---------------- Change this to alter the distance of moving forward
-	JPOS Move_Forward_2ft_return 
-	JUMP Move_Forward_2ft_cont
+	SUB	how_much_move	  ;; XPOS - InitX > how_much_move ?
+	JPOS Move_Forward_return 
+	JUMP Move_Forward_cont
 	
 Collision_detected: ;; for now, turn 90 left
 	LOAD Zero
 	OUT LVELCMD
 	LOAD Zero
 	OUT RVELCMD
-	JUMP Move_Forward_2ft_return
+	JUMP Move_Forward_return
 	
 	
-Move_Forward_2ft_return:
+Move_Forward_return:
+	LOAD ZERO
+	OUT RVELCMD
+	OUT LVELCMD
 	RETURN	
 	InitMoveForward_X: DW 0
-	Collision_distance: DW 0
 	
 	
 	
@@ -226,8 +233,6 @@ Turn_Around: ; (IN PROGRESS)
 	
 	IN     THETA
 	STORE init_theta
-	LOAD Deg90			;;       <-----------------change this to alter how much turn
-	STORE how_much_turn
 	
 	LOAD init_theta
 	ADD how_much_turn				
@@ -247,14 +252,18 @@ Turn_Around_cont:
 	JUMP Turn_Around_cont
 	
 Turn_Around_return:
+	LOAD Zero
+	OUT RVELCMD
 	RETURN	
 	
 	init_theta: DW 0
 	current_theta: DW 0
 	desired_degree: DW 0
-	how_much_turn: DW 0
 	
 	
+	
+	
+;; need to implement "stabil/itzie"	
 		
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
@@ -903,7 +912,9 @@ I2CError:
 ;* Variables
 ;***************************************************************
 Temp:     DW 0 ; "Temp" is not a great name, but can be useful
-
+how_much_turn: DW 0
+how_much_move: DW 0
+Collision_distance: DW 0
 ;***************************************************************
 ;* Constants
 ;* (though there is nothing stopping you from writing to these)
