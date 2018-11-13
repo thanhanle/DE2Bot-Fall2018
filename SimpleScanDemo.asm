@@ -269,7 +269,182 @@ Turn_Around_return:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EDITED BY JUMONG ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		
+
+; bens stuff
+
+; Scans the robots surroundings
+Scan:
+	CLI    &B0010      ; disable the movement API interrupt
+	CALL   AcquireData ; perform a 360 degree scan
+
+; Detects that a wedge is prefaced by req_zeros zeros	
+	LOADI	DataArray	; get the array start address
+	STORE	ArrayIndex
+	ADDI	360	
+	STORE	EndIndex
 	
+	ILOAD	ArrayIndex	; get the first entry of the array
+	SUB		trunc_val
+	JNEG	DetectZero	; if its a zero, increment the counter
+	LOAD 	counter
+	ADDI	1
+	STORE	counter		; increment the counter because we found a zero val	
+
+DetectZero:
+	LOAD	ArrayIndex
+	ADDI	1
+	STORE	ArrayIndex	; move to next entry
+	XOR		EndIndex
+	JZERO	SCAN		; didnt find reflector, scan again to start over
+	
+	ILOAD	ArrayIndex
+	SUB		trunc_val
+	JNEG	CheckCount	; if less than trunc_val, might be the reflector, but check the zero count to be sure
+	
+	LOAD 	counter
+	ADDI	1
+	STORE	counter		; increment the counter because we found a zero val
+	JUMP	DetectZero
+	
+CheckCount:
+	LOAD	counter
+	SUB		req_zeros
+	JNEG	ResetCounter	; if we havent found enough zeros in a row, reset the counter and keep looking
+	
+	ILOAD	ArrayIndex
+	STORE	start_dist	; store the distance of the non-zero value 
+	LOAD	ArrayIndex
+	SUB		DataArray
+	STORE	start_ang	; store the angle of the non-zero value
+	JUMP	DetectBuffer
+	
+ResetCounter:
+	LOAD	Zero		; reset the counter
+	STORE	counter
+	JUMP	DetectZero
+
+; Detects a "buffer" of req_buf values within buf_tol of the initial value found after the zeros	
+DetectBuffer:
+	LOAD	ArrayIndex
+	ADD		req_buf
+	STORE	EndIndex	; start looking for drop if consistently within tolerance for req_buf entries
+	LOAD	One
+	STORE	counter
+	
+BufferLoop:
+	LOAD	ArrayIndex
+	ADDI	1
+	STORE	ArrayIndex	; move to next entry
+	XOR		EndIndex
+	JZERO	DetectDrop	; found req_buf entries within tolerance, start looking for drop
+	
+	ILOAD	ArrayIndex	; check if abs(ArrayIndex - start_dist) <= buf_tol
+	SUB		start_dist
+	CALL	ABS			
+	SUB		buf_tol
+	JPOS	ResetCounter	; if its not, find the next wedge
+	
+	LOAD	counter
+	ADDI	1
+	STORE	counter		; increment the counter
+	JUMP	BufferLoop
+
+; detects the distinctive drop in the middle of the reflector 
+; (drop defined as finding a value drop_req from the first value found after the zeros)
+DetectDrop:
+	LOAD	ArrayIndex
+	ADDI	360
+	STORE	EndIndex	
+	
+DropLoop:
+	LOAD	ArrayIndex
+	ADDI	1
+	STORE	ArrayIndex
+	XOR		EndIndex
+	JZERO	Scan		; if we get back around the circle, something went wrong so start over (better failure criteria?)
+	
+	ILOAD	ArrayIndex
+	SUB		start_dist
+	JPOS	Scan		; ArrayIndex - start_dist should give negative number that when less than 50 indicates a drop so if positive, something is wrong, rescan
+	ADD		drop_req
+	JPOS	ConsToDrop
+	JUMP	DropLoop
+
+; Detects at least req_buf consistent points within a tolerance of buf_tol before a drop to zero	
+ConsToDrop:
+	LOAD	ArrayIndex
+	ADDI	360
+	STORE	EndIndex
+	LOAD	start_dist
+	SUB		drop_req
+	STORE	start_dist	; create post-drop start_dist
+	LOAD	Zero
+	STORE	counter
+	
+ConsLoop:
+	LOAD	ArrayIndex
+	ADDI	1
+	STORE	ArrayIndex
+	XOR		EndIndex
+	JZERO	Scan		; same as before, maybe better failure criteria, but definitely messed up if we make it all the way around
+	
+	ILOAD	ArrayIndex
+	SUB		trunc_val
+	JPOS	FoundRef	; if greater than trunc_val, we may have found the reflector, have to check that we found a large enough buffer first
+
+	ILOAD	ArrayIndex	; check if abs(ArrayIndex - start_dist) <= buf_tol
+	SUB		start_dist
+	CALL	ABS			
+	SUB		buf_tol
+	JPOS	Scan		; if its not, something is wrong, rescan
+	
+	LOAD	counter
+	ADDI	1
+	STORE	counter
+	JUMP	ConsLoop
+	
+
+; Checks to see that we found enough consistent points before the drop to zero
+; points the robot towards the reflector if enough points are found, rescans
+; otherwise
+FoundRef:
+	LOAD	counter
+	SUB		req_buf
+	JNEG	Scan		; if we havent found enough points first, something is wrong, rescan
+	
+	LOAD	ArrayIndex
+	SUB		One
+	STORE	ArrayIndex
+	ILOAD	ArrayIndex
+	STORE	end_dist
+	LOAD	ArrayIndex
+	SUB		DataArray
+	STORE	end_ang		; Store the end angle and distance of the wedge we have found
+	
+	SEI    	&B0010
+	LOAD	end_ang
+	ADD		start_ang
+	STORE	d16sN
+	LOAD	Two
+	STORE	d16sD
+	CALL	Div16s
+	LOAD	dres16sQ	
+	STORE	DTheta		; use movement API to point at (start_ang + end_ang) / 2
+	
+	counter: 	DW	0
+	req_zeros: 	DW 	5 	; CONSTANT for number of consecutive zeros needed to start checking for a consistent buffer block
+	trunc_val:	DW 	7000; CONSTANT for max distance before ignoring value
+	req_buf:	DW	7	; CONSTANT for number of consecutive readings that must be within a certain range to be considered a buffer block
+	buf_tol:	DW	10	; CONSTANT for tolerance for deviation from first reading to be considered within buffer block
+	drop_req:	DW	51	; CONSTANT for distance to be considered a drop (must be one larger than desired requirement to allow for JPOS on line 364)
+	
+	start_dist:	DW	0	; VARIABLE for distance of nonzero value found after req_zeros zeros
+	start_ang:	DW	0	; VARIABLE for angle of nonzero value found after req_zeros zeros
+	end_dist:	DW	0	; VARIABLE for distance of nonzero value found before last drop to zero
+	end_ang:	DW	0	; VARIABLE for angle of nonzero value found before last drop to zero
+		
+
+; end bens stuff
 	
 		
 ; FindClosest subroutine will go through the acquired data
