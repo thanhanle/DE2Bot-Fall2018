@@ -365,7 +365,7 @@ DropLoop:
 	
 	ILOAD	ArrayIndex
 	SUB		start_dist
-	JPOS	Scan		; ArrayIndex - start_dist should give negative number that when less than 50 indicates a drop so if positive, something is wrong, rescan
+	JPOS	Scan		; ArrayIndex - start_dist should give negative number that when less than drop_req indicates a drop so if positive, something is wrong, rescan
 	ADD		drop_req
 	JPOS	ConsToDrop
 	JUMP	DropLoop
@@ -404,8 +404,8 @@ ConsLoop:
 	JUMP	ConsLoop
 	
 
-; Checks to see that we found enough consistent points before the drop to zero
-; points the robot towards the reflector if enough points are found, rescans
+; Checks to see that we found enough consistent points before the drop to zero.
+; Points the robot towards the reflector if enough points are found, rescans
 ; otherwise
 FoundRef:
 	LOAD	counter
