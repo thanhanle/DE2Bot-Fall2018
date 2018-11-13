@@ -21,13 +21,15 @@ for(int i = 0; i<360; i++){
 void foundReflector(int currentAngle){
 	// our first data point should be near the others
 	while(currentAngle<7000){
+		// if at any point these conditions are not met, call groundZero
 		// we're still in the reflector
 		// see if the values are similar
 		// look for a small dip
 		// see if the values are similar
 		// keep on moving
 		// look for > 7000 i.e. the end of the reflector
-		// rotate to that coordinate - 10 degrees or so
+		// if we made it here, call a weKnowWhereTheReflectorIs function
+		// rotate to that final coordinate -(?) 10 degrees or so
 		// head towards it and stop when you get close
 		// rotate left
 		// follow the wall
