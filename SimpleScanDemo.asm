@@ -69,21 +69,25 @@ Main:
 	LOADI  10          ; period = (10 ms * 10) = 0.1s, or 10Hz.
 	OUT    CTIMER      ; turn on timer peripheral
 	
+	JUMP	Scan
+	
 	;;;; Demo code to acquire sonar data during a rotation
 	;CLI    &B0010      ; disable the movement API interrupt
 	;CALL   AcquireData ; perform a 360 degree scan
 	
-	CLI &B0010
+;	CLI &B0010
 	
-	LOAD	Ft4
-	STORE how_much_move
-	LOAD	Ft2									; <------------------ Change this to alter the collision distance
-	STORE Collision_distance
-	CALL Move_Forward
-	
-	LOAD Deg90			;;       <-----------------change this to alter how much turn
-	STORE how_much_turn
-	CALL Turn_Around
+;	LOAD	Ft4
+;	STORE how_much_move
+;	LOAD	Ft2									; <------------------ Change this to alter the collision distance
+;	STORE Collision_distance
+;	CALL Move_Forward
+;	
+;	LOAD Deg90			;;       <-----------------change this to alter how much turn
+;	STORE how_much_turn
+;	CALL Turn_Around
+
+
 	;;;; Demo code to turn to face the closest object seen
 	; Before enabling the movement control code, set it to
 	; not start moving immediately.
@@ -99,7 +103,7 @@ Main:
 
 	; FindClosest returns the angle to the closest object
 	;CALL   FindClosest
-	OUT    SSEG2       ; useful debugging info
+	;OUT    SSEG2       ; useful debugging info
 	
 	; To turn to that angle using the movement API, just store
 	; the angle into the "desired theta" variable.
@@ -324,6 +328,7 @@ ResetCounter:
 	JUMP	DetectZero
 
 ; Detects a "buffer" of req_buf values within buf_tol of the initial value found after the zeros	
+; TODO: compare to previous index for tolerance, not first point
 DetectBuffer:
 	LOAD	ArrayIndex
 	ADD		req_buf
@@ -344,13 +349,12 @@ BufferLoop:
 	SUB		buf_tol
 	JPOS	ResetCounter	; if its not, find the next wedge
 	
-	LOAD	counter
-	ADDI	1
-	STORE	counter		; increment the counter
 	JUMP	BufferLoop
 
 ; detects the distinctive drop in the middle of the reflector 
 ; (drop defined as finding a value drop_req from the first value found after the zeros)
+; TODO: Check that points stay within margin, not check for always decreasing (use buf_tol)
+; TODO: compare to previous index for tolerance, not first point
 DetectDrop:
 	LOAD	ArrayIndex
 	ADDI	360
@@ -430,13 +434,14 @@ FoundRef:
 	CALL	Div16s
 	LOAD	dres16sQ	
 	STORE	DTheta		; use movement API to point at (start_ang + end_ang) / 2
+	JUMP	Die
 	
 	counter: 	DW	0
-	req_zeros: 	DW 	5 	; CONSTANT for number of consecutive zeros needed to start checking for a consistent buffer block
+	req_zeros: 	DW 	1 	; CONSTANT for number of consecutive zeros needed to start checking for a consistent buffer block
 	trunc_val:	DW 	7000; CONSTANT for max distance before ignoring value
 	req_buf:	DW	7	; CONSTANT for number of consecutive readings that must be within a certain range to be considered a buffer block
-	buf_tol:	DW	10	; CONSTANT for tolerance for deviation from first reading to be considered within buffer block
-	drop_req:	DW	51	; CONSTANT for distance to be considered a drop (must be one larger than desired requirement to allow for JPOS on line 364)
+	buf_tol:	DW	30	; CONSTANT for tolerance for deviation from first reading to be considered within buffer block
+	drop_req:	DW	100	; CONSTANT for distance to be considered a drop (must be one larger than desired requirement to allow for JPOS on line 364)
 	
 	start_dist:	DW	0	; VARIABLE for distance of nonzero value found after req_zeros zeros
 	start_ang:	DW	0	; VARIABLE for angle of nonzero value found after req_zeros zeros
