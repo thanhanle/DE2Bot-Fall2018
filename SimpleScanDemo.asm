@@ -73,17 +73,20 @@ Main:
 	;CLI    &B0010      ; disable the movement API interrupt
 	;CALL   AcquireData ; perform a 360 degree scan
 	
-	CLI &B0010
 	
-	LOAD	Ft4
-	STORE how_much_move
-	LOAD	Ft2									; <------------------ Change this to alter the collision distance
-	STORE Collision_distance
+	
 	CALL Move_Forward
 	
-	LOAD Deg90			;;       <-----------------change this to alter how much turn
-	STORE how_much_turn
-	CALL Turn_Around
+	CALL Turn_Around_90
+	
+	CALL Move_Forward
+	
+	CALL Turn_Around_30
+	
+	CALL Move_Forward
+	
+	CALL Turn_Around_60
+	 
 	;;;; Demo code to turn to face the closest object seen
 	; Before enabling the movement control code, set it to
 	; not start moving immediately.
@@ -189,7 +192,10 @@ Move_Forward: ; move back until x pos is greater than 2 feet (COMPLETED)
 	
 	IN	XPOS
 	STORE InitMoveForward_X
-	
+	LOAD	Ft4
+	STORE how_much_move
+	LOAD	Ft2									; <------------------ Change this to alter the collision distance
+	STORE Collision_distance
 	
 Move_Forward_cont:
 	LOAD   Mask2
@@ -223,44 +229,117 @@ Collision_detected: ;; for now, turn 90 left
 Move_Forward_return:
 	LOAD ZERO
 	OUT RVELCMD
+	LOAD ZERO
 	OUT LVELCMD
 	RETURN	
 	InitMoveForward_X: DW 0
+	how_much_move: DW 0
+	Collision_distance: DW 0
 	
 	
 	
-Turn_Around: ; (IN PROGRESS)
+Turn_Around_90: ; (IN PROGRESS)
 	
 	IN     THETA
-	STORE init_theta
+	STORE init_theta_90
+	LOAD Deg90			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_90
 	
-	LOAD init_theta
-	ADD how_much_turn				
-	STORE desired_degree
+	LOAD init_theta_90
+	ADD how_much_turn_90				
+	STORE desired_degree_90
 	
-Turn_Around_cont:	
-	LOAD   Zero
+Turn_Around_90_cont:	
+	LOAD Zero
+	SUB FSlow
 	OUT	LVELCMD
 	LOAD FSlow
 	OUT RVELCMD
 	
 	IN THETA
-	STORE current_theta
-	LOAD desired_degree
-	SUB current_theta ; desired_degree - current_theta
-	JNEG Turn_Around_return
-	JUMP Turn_Around_cont
+	SUB desired_degree_90 ; current_theta - desired_degree 
+	JPOS Turn_Around_90_return 
+	JUMP Turn_Around_90_cont
 	
-Turn_Around_return:
+Turn_Around_90_return:
 	LOAD Zero
 	OUT RVELCMD
 	RETURN	
 	
-	init_theta: DW 0
-	current_theta: DW 0
-	desired_degree: DW 0
+	
+	init_theta_90: DW 0
+	how_much_turn_90: DW 0
+	current_theta_90: DW 0
+	desired_degree_90: DW 0
+	
+Turn_Around_30: ; (IN PROGRESS)
+	
+	IN     THETA
+	STORE init_theta_30
+	LOAD Deg30			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_30
+	
+	LOAD init_theta_30
+	ADD how_much_turn_30				
+	STORE desired_degree_30
+	
+Turn_Around_30_cont:	
+	LOAD Zero
+	SUB FSlow
+	OUT	LVELCMD
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	SUB desired_degree_30 ; current_theta - desired_degree 
+	JPOS Turn_Around_30_return 
+	JUMP Turn_Around_30_cont
+	
+Turn_Around_30_return:
+	LOAD Zero
+	OUT RVELCMD
+	RETURN	
 	
 	
+	init_theta_30: DW 0
+	how_much_turn_30: DW 0
+	current_theta_30: DW 0
+	desired_degree_30: DW 0
+	
+	
+Turn_Around_60: ; (IN PROGRESS)
+	
+	IN     THETA
+	STORE init_theta_60
+	LOAD Deg60			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_60
+	
+	LOAD init_theta_60
+	ADD how_much_turn_60				
+	STORE desired_degree_60
+	
+Turn_Around_60_cont:	
+	LOAD Zero
+	SUB FSlow
+	OUT	LVELCMD
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	SUB desired_degree_60 ; current_theta - desired_degree 
+	JPOS Turn_Around_60_return 
+	JUMP Turn_Around_60_cont
+	
+Turn_Around_60_return:
+	LOAD Zero
+	OUT RVELCMD
+	RETURN	
+	
+	
+	init_theta_60: DW 0
+	how_much_turn_60: DW 0
+	current_theta_60: DW 0
+	desired_degree_60: DW 0		
 	
 	
 ;; need to implement "stabil/itzie"	
@@ -912,9 +991,6 @@ I2CError:
 ;* Variables
 ;***************************************************************
 Temp:     DW 0 ; "Temp" is not a great name, but can be useful
-how_much_turn: DW 0
-how_much_move: DW 0
-Collision_distance: DW 0
 ;***************************************************************
 ;* Constants
 ;* (though there is nothing stopping you from writing to these)
@@ -952,6 +1028,8 @@ HalfMeter: DW 481      ; ~0.5m in 1.04mm units
 Ft2:      DW 586       ; ~2ft in 1.04mm units
 Ft3:      DW 879
 Ft4:      DW 1172
+Deg30:	  DW 30
+Deg60:    DW 60
 Deg90:    DW 90        ; 90 degrees in odometer units
 Deg180:   DW 180       ; 180
 Deg270:   DW 270       ; 270
