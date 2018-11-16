@@ -122,6 +122,82 @@ InfLoop:
 	; note that the movement API will still be running during this
 	; infinite loop, because it uses the timer interrupt.
 	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;; Turns towards middle of longest object ;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Scan:
+	CLI    &B0010      ; disable the movement API interrupt
+	CALL   AcquireData ; perform a 360 degree scan
+	
+	LOADI  	DataArray   ; get the array start address
+	STORE  	ArrayIndex
+	ILOAD	ArrayIndex  ; get the first entry of array
+	
+	; check if first index is a zero, if it is not, go back until an out of range value is found
+	SUB		zeroVal
+	JPOS	ForwardScan	; check if we need to backtrack
+	
+	ILOAD	ArrayIndex
+	STORE	lastVal
+	LOAD	ArrayIndex	; if we need to backtrack, go to last index and subract until we find something out of range
+	STORE	start
+	ADDI	359
+	STORE	ArrayIndex
+	
+BackTrack:
+	ILOAD	ArrayIndex
+	SUB		lastVal
+	CALL	Abs
+	SUB		tolerance
+	JPOS	FinishBackTrack	; Check if this value is within tolerance of last value, if so continue backtracking, else get ready to go forwards
+	
+	ILOAD 	ArrayIndex
+	STORE	lastVal
+	STORE	start
+	
+	LOAD	ArrayIndex
+	SUB		One
+	STORE	ArrayIndex	; Decrement the array to backtrack
+	
+	JUMP	BackTrack
+	
+FinishBackTrack:
+	LOAD	ArrayIndex
+	ADD		One
+	STORE	EndIndex	; Dont double count indices so end where we backtracked to
+	
+	LOADI	DataArray
+	ADDI	360
+	SUB		EndIndex
+	JPOS	ForwardScan	; check if backtracking was unnecessary, if so add one above will give 360, but really we want 0 as our start
+	
+	LOADI	DataArray
+	STORE	ArrayIndex
+	STORE	EndIndex
+	STORE	lastVal
+	STORE	start		; set start and last val to 0 degrees
+	
+	; for each index 1 -> end if find wedge and start not initialized, wedge = start, else wedge might be start
+ForwardScan:
+	LOADI	DataArray
+	ADD		One
+	STORE	ArrayIndex	; restart at 1 degrees to start scanning forward
+
+ForwardLoop:	
+	ILOAD	ArrayIndex
+	
+	
+	
+	
+
+	longest:	DW	0	; Keeps track of the longest arc
+	start:		DW	0	; Start degree of current arc
+	end:		DW	0	; End degree of current arc
+	longStart:	DW	0	; Start degree of longest arc
+	longEnd:	DW	0	; End degree of longest arc
+	lastVal		DW	0	; Last distance seen
+	tolerance:	DW	200
+	zeroVal:	DW	10000
 	
 
 ; AcquireData will turn the robot counterclockwise and record
