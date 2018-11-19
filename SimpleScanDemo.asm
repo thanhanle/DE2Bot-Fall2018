@@ -3,8 +3,7 @@
 ; - The movement API.
 ; - Several useful subroutines (ATAN2, Neg, Abs, mult, div).
 ; - Some useful constants (masks, numbers, robot stuff, etc.)
-
-; This code uses the timer interrupt for the movement control code.
+ ; This code uses the timer interrupt for the movement control code.
 ; The ISR jump table is located in mem 0-4.  See manual for details.
 ORG 0
 	JUMP   Init        ; Reset vector
@@ -12,8 +11,7 @@ ORG 0
 	JUMP   CTimer_ISR  ; Timer interrupt
 	RETI               ; UART interrupt (unused)
 	RETI               ; Motor stall interrupt (unused)
-
-;***************************************************************
+ ;***************************************************************
 ;* Initialization
 ;***************************************************************
 Init:
@@ -59,8 +57,7 @@ WaitForUser:
 	JPOS   WaitForUser ; not ready (KEYs are active-low, hence JPOS)
 	LOAD   Zero
 	OUT    XLEDS       ; clear LEDs once ready to continue
-
-;***************************************************************
+ ;***************************************************************
 ;* Main code
 ;***************************************************************
 Main:
@@ -85,23 +82,322 @@ Main:
 	; code in that ISR will attempt to control the robot.
 	; If you want to take manual control of the robot,
 	; execute CLI &B0010 to disable the timer interrupt.
-
-	; FindClosest returns the angle to the closest object
+ 	; FindClosest returns the angle to the closest object
 	CALL   FindClosest
 	OUT    SSEG2       ; useful debugging info
 	
 	; To turn to that angle using the movement API, just store
 	; the angle into the "desired theta" variable.
 	STORE  DTheta
+	LOAD   Mask3
+	OR     Mask5
+	OR     Mask6
+	OR     Mask4
+	OR     Mask2
+	OUT    SONAREN
+	CALL   Wait1
+	CALL   Wait1
+	CLI    &B0010      ; disable the movement API interrupt
+TopLoop:
+	CALL   Go
+	CALL   CheckTwo
+	CALL   CheckThree
+	CALL   CheckFour
+	CALL   CheckRight ; uncomment to try this again
+	CALL   CheckDone
+	
+	
+	LOAD   flag
+	JZERO  TopLoop
+	JUMP   EnterKeepMoving
+	; dist 3 is the distance
+	
+Go:
+	LOAD FSlow
+	ADDI 90
+	OUT  LVELCMD
+	OUT  RVELCMD
+	RETURN	
+	
+	; main loop
+EnterKeepMoving:
+	LOADI  &H140       ; short, high-pitched beep
+	OUT    BEEP        ; stop beeping
+KeepMoving:	
+	CALL   FlowerPetal
+	CALL   CheckTwo
+	CALL   CheckThree
+	CALL   CheckFour
+	CALL   CheckRight ; uncomment to try this again
+	CALL   CheckDone
+	JUMP   KeepMoving
 
-InfLoop: 
-	JUMP   InfLoop
 	; note that the movement API will still be running during this
 	; infinite loop, because it uses the timer interrupt.
+	;VARIABLES
+	shortDist: DW 400
+	rightDist: DW 150
+	finalNumb: DW 0
+	threeHunna: DW 300
+	threeThosa: DW 3000
+	fiveHunna:  DW 500
+	flag:       DW 0
 	
 	
+FlowerPetal:
+	LOAD FSlow
+	ADDI 80
+	OUT  LVELCMD
+	LOAD FSlow
+	ADDI 60
+	OUT  RVELCMD
+	RETURN	
 
-; AcquireData will turn the robot counterclockwise and record
+CheckThree:
+	CALL   SetFlag
+	IN     DIST3
+	SUB    shortDist ; dist3 - shortDist
+	JNEG   endIt3
+	RETURN
+endIt3:
+	LOAD   Zero
+	OUT    RVELCMD
+	OUT    LVELCMD
+	CALL   Turn_Around_90	
+	RETURN
+	
+CheckTwo:
+	CALL   SetFlag
+	IN     DIST2
+	OUT    SSEG2
+	SUB    shortDist ; dist3 - shortDist
+	JNEG   endIt4
+	RETURN
+endIt4:
+	LOAD   Zero
+	OUT    RVELCMD
+	OUT    LVELCMD
+	CALL   Turn_Around_90	
+	RETURN
+	
+CheckRight:
+	CALL   SetFlag
+	IN   DIST5
+	SUB  rightDist
+	JNEG endIt
+	RETURN
+endIt:
+	CALL Turn_Around_30
+	RETURN
+	
+CheckFour:
+	CALL   SetFlag
+	IN   DIST4
+	SUB  rightDist
+	JNEG   endIt5
+	RETURN
+endIt5:
+	LOAD   Zero
+	OUT    RVELCMD
+	OUT    LVELCMD
+	CALL   Turn_Around_60	
+	RETURN
+
+SetFlag:
+	LOAD flag
+	ADDI 1
+	STORE flag
+	RETURN
+
+	
+CheckDone:
+	; see if the last sonar to the right sonar 6 is 2700-3300
+	; radar 6 is the back right radar
+	; front radar 3 between 0 and 500
+	; right radar 5 between 0  and 500
+	LOAD  Zero
+	STORE finalNumb
+	IN    DIST6
+	OUT    SSEG2
+	SUB   threeThosa
+	CALL  Abs
+	SUB   threeHunna
+	JPOS  Check5
+	LOAD  finalNumb
+	ADDI  1
+	STORE finalNumb
+Check5:
+	IN    DIST5
+	SUB   fiveHunna
+	JPOS  Check3
+	LOAD  finalNumb
+	ADDI  1
+	STORE finalNumb
+Check3:
+	IN    DIST3
+	SUB   fiveHunna
+	JPOS  UpdateSseg
+	LOAD  finalNumb
+	ADDI  1
+	STORE finalNumb
+UpdateSseg:
+	LOAD  finalNumb
+	OUT   SSEG1
+	LOAD  Three
+	SUB   finalNumb
+	JZERO Stop
+	RETURN
+
+Stop:
+	LOAD Zero
+	OUT  LVELCMD
+	OUT  RVELCMD
+	JUMP Stop
+
+	
+	
+	
+	
+	
+	
+	
+Turn_Around_90: ; (IN PROGRESS)
+	OUT RESETPOS
+	IN     THETA
+	STORE init_theta_90
+	LOAD Deg90			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_90
+	
+	LOAD init_theta_90
+	ADD how_much_turn_90				
+	STORE desired_degree_90
+	
+Turn_Around_90_cont:	
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	SUB desired_degree_90 ; current_theta - desired_degree 
+	JPOS Turn_Around_90_return 
+	JUMP Turn_Around_90_cont
+	
+Turn_Around_90_return:
+	LOAD Zero
+	OUT RVELCMD
+	RETURN	
+	
+	init_theta_90: DW 0
+	how_much_turn_90: DW 0
+	current_theta_90: DW 0
+	desired_degree_90: DW 0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+Turn_Around_60: ; (IN PROGRESS)
+	OUT RESETPOS
+	IN     THETA
+	STORE init_theta_60
+	LOAD Deg60			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_60
+	
+	LOAD init_theta_60
+	ADD how_much_turn_60				
+	STORE desired_degree_60
+	
+Turn_Around_60_cont:	
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	SUB desired_degree_60 ; current_theta - desired_degree 
+	JPOS Turn_Around_60_return 
+	JUMP Turn_Around_60_cont
+	
+Turn_Around_60_return:
+	LOAD Zero
+	OUT RVELCMD
+	RETURN	
+	
+	
+	init_theta_60: DW 0
+	how_much_turn_60: DW 0
+	current_theta_60: DW 0
+	desired_degree_60: DW 0			
+	
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+Turn_Around_30: ; (IN PROGRESS)
+	OUT RESETPOS
+	IN     THETA
+	STORE init_theta_30
+	LOAD Deg30			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_30
+	
+	LOAD init_theta_30
+	ADD how_much_turn_30				
+	STORE desired_degree_30
+	
+Turn_Around_30_cont:	
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	SUB desired_degree_30 ; current_theta - desired_degree 
+	JPOS Turn_Around_30_return 
+	JUMP Turn_Around_30_cont
+	
+Turn_Around_30_return:
+	LOAD Zero
+	OUT RVELCMD
+	RETURN	
+	
+	
+	init_theta_30: DW 0
+	how_much_turn_30: DW 0
+	current_theta_30: DW 0
+	desired_degree_30: DW 0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+Turn_Around_15: ; (IN PROGRESS)
+	OUT RESETPOS
+	IN     THETA
+	STORE init_theta_15
+	LOAD Deg15			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_15
+	
+	LOAD init_theta_15
+	ADD how_much_turn_15				
+	STORE desired_degree_15
+	
+Turn_Around_15_cont:	
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	SUB desired_degree_15 ; current_theta - desired_degree 
+	JPOS Turn_Around_15_return 
+	JUMP Turn_Around_15_cont
+	
+Turn_Around_15_return:
+	LOAD Zero
+	OUT RVELCMD
+	RETURN	
+	
+	
+	init_theta_15: DW 0
+	how_much_turn_15: DW 0
+	current_theta_15: DW 0
+	desired_degree_15: DW 0
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+		
+ ; AcquireData will turn the robot counterclockwise and record
 ; 360 sonar values in memory.  The movement API must be disabled
 ; before calling this subroutine.
 AcquireData:
@@ -204,10 +500,7 @@ FCDone:
 	EndIndex:   DW 0
 	CloseIndex: DW 0
 	CloseVal:   DW 0
-
-
-
-Die:
+ Die:
 ; Sometimes it's useful to permanently stop execution.
 ; This will also catch the execution if it accidentally
 ; falls through from above.
@@ -221,9 +514,7 @@ Die:
 Forever:
 	JUMP   Forever     ; Do this forever.
 	DEAD:  DW &HDEAD   ; Example of a "local" variable
-
-
-; Timer ISR.  Currently just calls the movement control code.
+ ; Timer ISR.  Currently just calls the movement control code.
 ; You could, however, do additional tasks here if desired.
 CTimer_ISR:
 	CALL   ControlMovement
@@ -248,8 +539,7 @@ ControlMovement:
 	CALL   CapValue    ; get a +/- max of 50
 	ADD    CMAErr
 	STORE  CMAErr      ; now contains a desired differential
-
-	
+ 	
 	; For this basic control method, simply take the
 	; desired forward velocity and add the differential
 	; velocity for each wheel when turning is needed.
@@ -266,8 +556,7 @@ ControlMovement:
 	ADD    DVel
 	CALL   CapValue
 	STORE  CMAL
-
-	; ensure enough differential is applied
+ 	; ensure enough differential is applied
 	LOAD   CMAErr
 	SHIFT  1           ; double the differential
 	STORE  CMAErr
@@ -284,19 +573,16 @@ ControlMovement:
 	SUB    CMAErr
 	CALL   CapValue
 	STORE  CMAR
-
-CMADone:
+ CMADone:
 	LOAD   CMAL
 	OUT    LVELCMD
 	LOAD   CMAR
 	OUT    RVELCMD
-
-	RETURN
+ 	RETURN
 	CMAErr: DW 0       ; holds angle error velocity
 	CMAL:    DW 0      ; holds temp left velocity
 	CMAR:    DW 0      ; holds temp right velocity
-
-; Returns the current angular error wrapped to +/-180
+ ; Returns the current angular error wrapped to +/-180
 GetThetaErr:
 	; convenient way to get angle error in +/-180 range is
 	; ((error + 180) % 360 ) - 180
@@ -307,8 +593,7 @@ GetThetaErr:
 	CALL   Mod360
 	ADDI   -180
 	RETURN
-
-; caps a value to +/-MaxVal
+ ; caps a value to +/-MaxVal
 CapValue:
 	SUB     MaxVal
 	JPOS    CapVelHigh
@@ -325,8 +610,7 @@ CapVelLow:
 	CALL    Neg
 	RETURN
 	MaxVal: DW 510
-
-;***************************************************************
+ ;***************************************************************
 ;* Useful Subroutines
 ;***************************************************************
 SendData:
@@ -358,9 +642,7 @@ SDLoop2:
 	SUB     Temp        ; check if at end of array
 	JNEG    SDLoop1
 	JUMP    Die         ; when done, go to infinite loop
-
-
-;*******************************************************************************
+ ;*******************************************************************************
 ; Mod360: modulo 360
 ; Returns AC%360 in AC
 ; Written by Kevin Johnson.  No licence or copyright applied.
@@ -374,8 +656,7 @@ M360N:
 	ADDI   360
 	JNEG   M360N
 	RETURN
-
-;*******************************************************************************
+ ;*******************************************************************************
 ; Abs: 2's complement absolute value
 ; Returns abs(AC) in AC
 ; Neg: 2's complement negation
@@ -389,8 +670,7 @@ Neg:
 	ADDI   1            ; Add one (i.e. negate number)
 Abs_r:
 	RETURN
-
-;******************************************************************************;
+ ;******************************************************************************;
 ; Atan2: 4-quadrant arctangent calculation                                     ;
 ; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ;
 ; Original code by Team AKKA, Spring 2015.                                     ;
@@ -525,8 +805,7 @@ AtanRatio:  DW 0        ; =y/x
 AtanT:      DW 0        ; temporary value
 A2c:        DW 72       ; 72/256=0.28125, with 8 fractional bits
 A2cd:       DW 14668    ; = 180/pi with 8 fractional bits
-
-;*******************************************************************************
+ ;*******************************************************************************
 ; Mult16s:  16x16 -> 32-bit signed multiplication
 ; Based on Booth's algorithm.
 ; Written by Kevin Johnson.  No licence or copyright applied.
@@ -581,8 +860,7 @@ m16sc: DW 0 ; carry
 mcnt16s: DW 0 ; counter
 mres16sL: DW 0 ; result low
 mres16sH: DW 0 ; result high
-
-;*******************************************************************************
+ ;*******************************************************************************
 ; Div16s:  16/16 -> 16 R16 signed division
 ; Written by Kevin Johnson.  No licence or copyright applied.
 ; Warning: results undefined if denominator = 0.
@@ -654,8 +932,7 @@ d16sC1: DW 0 ; carry value
 d16sC2: DW 0 ; carry value
 dres16sQ: DW 0 ; quotient result
 dres16sR: DW 0 ; remainder result
-
-;*******************************************************************************
+ ;*******************************************************************************
 ; L2Estimate:  Pythagorean distance estimation
 ; Written by Kevin Johnson.  No licence or copyright applied.
 ; Warning: this is *not* an exact function.  I think it's most wrong
@@ -719,9 +996,7 @@ L2Y:  DW 0
 L2T1: DW 0
 L2T2: DW 0
 L2T3: DW 0
-
-
-; Subroutine to wait (block) for 1 second
+ ; Subroutine to wait (block) for 1 second
 Wait1:
 	OUT    TIMER
 Wloop:
@@ -730,8 +1005,7 @@ Wloop:
 	ADDI   -10         ; 1 second at 10Hz.
 	JNEG   Wloop
 	RETURN
-
-; This subroutine will get the battery voltage,
+ ; This subroutine will get the battery voltage,
 ; and stop program execution if it is too low.
 ; SetupI2C must be executed prior to this.
 BattCheck:
@@ -772,8 +1046,7 @@ GetBattLvl:
 	CALL   BlockI2C    ; wait for it to finish
 	IN     I2C_DATA    ; get the returned data
 	RETURN
-
-; Subroutine to configure the I2C for reading batt voltage
+ ; Subroutine to configure the I2C for reading batt voltage
 ; Only needs to be done once after each reset.
 SetupI2C:
 	CALL   BlockI2C    ; wait for idle
@@ -803,13 +1076,11 @@ I2CError:
 	OUT    SSEG1
 	OUT    SSEG2       ; display error message
 	JUMP   I2CError
-
-;***************************************************************
+ ;***************************************************************
 ;* Variables
 ;***************************************************************
 Temp:     DW 0 ; "Temp" is not a great name, but can be useful
-
-;***************************************************************
+ ;***************************************************************
 ;* Constants
 ;* (though there is nothing stopping you from writing to these)
 ;***************************************************************
@@ -825,8 +1096,7 @@ Seven:    DW 7
 Eight:    DW 8
 Nine:     DW 9
 Ten:      DW 10
-
-; Some bit masks.
+ ; Some bit masks.
 ; Masks of multiple bits can be constructed by ORing these
 ; 1-bit masks together.
 Mask0:    DW &B00000001
@@ -839,13 +1109,15 @@ Mask6:    DW &B01000000
 Mask7:    DW &B10000000
 LowByte:  DW &HFF      ; binary 00000000 1111111
 LowNibl:  DW &HF       ; 0000 0000 0000 1111
-
-; some useful movement values
+ ; some useful movement values
 OneMeter: DW 961       ; ~1m in 1.04mm units
 HalfMeter: DW 481      ; ~0.5m in 1.04mm units
 Ft2:      DW 586       ; ~2ft in 1.04mm units
 Ft3:      DW 879
 Ft4:      DW 1172
+Deg15:    DW 15 
+Deg30:    DW 30 
+Deg60:    DW 60 
 Deg90:    DW 90        ; 90 degrees in odometer units
 Deg180:   DW 180       ; 180
 Deg270:   DW 270       ; 270
@@ -856,12 +1128,10 @@ FMid:     DW 350       ; 350 is a medium speed
 RMid:     DW -350
 FFast:    DW 500       ; 500 is almost max speed (511 is max)
 RFast:    DW -500
-
-MinBatt:  DW 140       ; 14.0V - minimum safe battery voltage
+ MinBatt:  DW 140       ; 14.0V - minimum safe battery voltage
 I2CWCmd:  DW &H1190    ; write one i2c byte, read one byte, addr 0x90
 I2CRCmd:  DW &H0190    ; write nothing, read one byte, addr 0x90
-
-DataArray:
+ DataArray:
 	DW 0
 ;***************************************************************
 ;* IO address space map
@@ -906,4 +1176,4 @@ RESETPOS: EQU &HC3  ; write anything here to reset odometry to 0
 RIN:      EQU &HC8
 LIN:      EQU &HC9
 IR_HI:    EQU &HD0  ; read the high word of the IR receiver (OUT will clear both words)
-IR_LO:    EQU &HD1  ; read the low word of the IR receiver (OUT will clear both words)
+IR_LO:    EQU &HD1  ; read the low word of the IR receiver (OUT will clear both words) 
