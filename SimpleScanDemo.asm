@@ -154,7 +154,7 @@ FlowerPetal:
 	RETURN	
 
 CheckThree:
-	CALL   SetFlag
+	
 	IN     DIST3
 	SUB    shortDist ; dist3 - shortDist
 	JNEG   endIt3
@@ -163,11 +163,12 @@ endIt3:
 	LOAD   Zero
 	OUT    RVELCMD
 	OUT    LVELCMD
-	CALL   Turn_Around_90	
+	CALL   Turn_Around_90
+	CALL   SetFlag	
 	RETURN
 	
 CheckTwo:
-	CALL   SetFlag
+	
 	IN     DIST2
 	OUT    SSEG2
 	SUB    shortDist ; dist3 - shortDist
@@ -177,21 +178,23 @@ endIt4:
 	LOAD   Zero
 	OUT    RVELCMD
 	OUT    LVELCMD
-	CALL   Turn_Around_90	
+	CALL   Turn_Around_90
+	CALL   SetFlag	
 	RETURN
 	
 CheckRight:
-	CALL   SetFlag
+	
 	IN   DIST5
 	SUB  rightDist
 	JNEG endIt
 	RETURN
 endIt:
 	CALL Turn_Around_30
+	CALL   SetFlag
 	RETURN
 	
 CheckFour:
-	CALL   SetFlag
+	
 	IN   DIST4
 	SUB  rightDist
 	JNEG   endIt5
@@ -201,6 +204,7 @@ endIt5:
 	OUT    RVELCMD
 	OUT    LVELCMD
 	CALL   Turn_Around_60	
+	CALL   SetFlag
 	RETURN
 
 SetFlag:
