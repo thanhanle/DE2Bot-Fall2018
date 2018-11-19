@@ -64,6 +64,31 @@ WaitForUser:
 ;* Main code
 ;***************************************************************
 Main:
+	CALL   FindClosest
+	OUT    SSEG2       ; useful debugging info
+	
+	; To turn to that angle using the movement API, just store
+	; the angle into the "desired theta" variable.
+	STORE  DTheta
+	LOAD   Mask3
+	OUT    SONAREN
+	; dist 3 is the distance
+KeepMoving:	
+	IN     DIST3
+	OUT    SSEG2
+	SUB    shortDist ; dist3 - shortDist
+	JNEG   TurnLeft
+	JUMP   KeepMoving
+	CALL   Turn_Around_60	
+	
+ InfLoop: 
+	JUMP   InfLoop
+	; note that the movement API will still be running during this
+	; infinite loop, because it uses the timer interrupt.
+	;VARIABLES
+	shortDist: DW 300
+	
+	
 	OUT    RESETPOS    ; reset the odometry to 0,0,0
 	; configure timer interrupt for the movement control code
 	LOADI  10          ; period = (10 ms * 10) = 0.1s, or 10Hz.
