@@ -70,29 +70,49 @@ Main:
 	OUT    CTIMER      ; turn on timer peripheral
 	
 	;;;; Demo code to acquire sonar data during a rotation
-	CLI    &B0010      ; disable the movement API interrupt
-	CALL   AcquireData ; perform a 360 degree scan
+	;CLI    &B0010      ; disable the movement API interrupt
+	;CALL   AcquireData ; perform a 360 degree scan
 	
+	
+;D:	CALL Turn_Around_1
+;	JUMP D	
+	
+;Z: 	CALL Turn_Right_1
+;	JUMP Z
+	
+	; scan face direction of wall
+	; move to wall
+	CALL MAW
+	; move along wall until x ft
+	; turn left 90 deg
+	; move x ft
+	; turn right 90 deg
+	; move x ft
+	
+	
+	
+
+
 	;;;; Demo code to turn to face the closest object seen
 	; Before enabling the movement control code, set it to
 	; not start moving immediately.
-	LOADI  0
-	STORE  DVel        ; zero desired forward velocity
-	IN     THETA
-	STORE  DTheta      ; desired heading = current heading
-	SEI    &B0010      ; enable interrupts from source 2 (timer)
+	;LOADI  0
+	;STORE  DVel        ; zero desired forward velocity
+	;IN     THETA
+	;STORE  DTheta      ; desired heading = current heading
+	;SEI    &B0010      ; enable interrupts from source 2 (timer)
 	; at this point, timer interrupts will be firing at 10Hz, and
 	; code in that ISR will attempt to control the robot.
 	; If you want to take manual control of the robot,
 	; execute CLI &B0010 to disable the timer interrupt.
 
 	; FindClosest returns the angle to the closest object
-	CALL   FindClosest
+	;CALL   FindClosest
 	OUT    SSEG2       ; useful debugging info
 	
 	; To turn to that angle using the movement API, just store
 	; the angle into the "desired theta" variable.
-	STORE  DTheta
+	;STORE  DTheta
 
 InfLoop: 
 	JUMP   InfLoop
@@ -167,7 +187,380 @@ ADStore:
 	OrigTheta: DW 0
 	CurrTheta: DW 0
 	TurnTracker: DW 0
+
 	
+	
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EDITED BY JUMONG ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+
+	
+Move_Forward: ; move back until x pos is greater than 2 feet (COMPLETED)
+	OUT RESETPOS
+	LOAD	Ft2
+	STORE how_much_move
+	OUT SSEG2
+	LOAD	Ft2									; <------------------ Change this to alter the collision distance
+	ADDI		100
+	STORE Collision_distance
+	
+	LOAD   Mask2
+	OR	Mask3
+	OR  Mask1   ; this is necessary ( there is a case sonar 2 does not get the reflected wave, if bot goes diagnally)
+	OR  Mask4
+	OR  Mask0
+	OR  Mask5
+	OUT    SONAREN
+	
+Move_Forward_cont:
+	
+	IN DIST2 ;; checking it is in range of collision_distance
+	SUB Collision_distance  ;if (DIST2 < Collision_distance) -> collision detected
+	JNEG Collision_detected
+	IN DIST3
+	SUB Collision_distance
+	JNEG Collision_detected
+		
+	LOAD FSlow
+	OUT RVELCMD
+	OUT LVELCMD
+	IN XPOS
+	OUT SSEG1
+	SUB	how_much_move	  ;; XPOS > how_much_move ?
+	JZERO Move_Forward_return
+	JPOS Move_Forward_return 
+	JUMP Move_Forward_cont
+	
+Collision_detected: ;; for now, turn 90 left
+	LOAD Zero
+	OUT LVELCMD
+	OUT RVELCMD
+	OUT SONAREN
+	JUMP Move_Forward_return
+	
+	
+Move_Forward_return:
+	LOAD ZERO
+	OUT RVELCMD
+	OUT LVELCMD
+	OUT SONAREN
+	RETURN	
+	how_much_move: DW 0
+	Collision_distance: DW 0
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+Move_Continue:	
+	OUT RESETPOS
+	LOAD	Ft2									; <------------------ Change this to alter the collision distance
+	ADDI		100
+	STORE Collision_distance_continue
+	
+	LOAD   Mask2
+	OR	Mask3
+	OUT    SONAREN
+
+		
+Move_Continue_cont:
+	
+	IN DIST2 ;; checking it is in range of collision_distance
+	SUB Collision_distance_continue  ;if (DIST2 < Collision_distance) -> collision detected
+	JNEG Collision_detected_continue
+	IN DIST3
+	SUB Collision_distance_continue
+	JNEG Collision_detected_continue
+		
+	LOAD FSlow
+	OUT RVELCMD
+	OUT LVELCMD
+	IN XPOS
+	OUT SSEG1
+	JUMP Move_Continue_cont
+	
+Collision_detected_continue: ;; for now, turn 90 left
+	LOAD Zero
+	OUT LVELCMD
+	OUT RVELCMD
+	OUT SONAREN
+	RETURN
+	
+	
+	
+	Collision_distance_continue: DW 0	
+	
+	
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+Turn_Around_90: ; (IN PROGRESS)
+	OUT RESETPOS
+	IN     THETA
+	STORE init_theta_90
+	LOAD Deg90			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_90
+	
+	LOAD init_theta_90
+	ADD how_much_turn_90				
+	STORE desired_degree_90
+	
+Turn_Around_90_cont:	
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	SUB desired_degree_90 ; current_theta - desired_degree 
+	JPOS Turn_Around_90_return 
+	JUMP Turn_Around_90_cont
+	
+Turn_Around_90_return:
+	LOAD Zero
+	OUT RVELCMD
+	RETURN	
+	
+	init_theta_90: DW 0
+	how_much_turn_90: DW 0
+	current_theta_90: DW 0
+	desired_degree_90: DW 0
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+Turn_Around_60: ; (IN PROGRESS)
+	OUT RESETPOS
+	IN     THETA
+	STORE init_theta_60
+	LOAD Deg60			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_60
+	
+	LOAD init_theta_60
+	ADD how_much_turn_60				
+	STORE desired_degree_60
+	
+Turn_Around_60_cont:	
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	SUB desired_degree_60 ; current_theta - desired_degree 
+	JPOS Turn_Around_60_return 
+	JUMP Turn_Around_60_cont
+	
+Turn_Around_60_return:
+	LOAD Zero
+	OUT RVELCMD
+	RETURN	
+	
+	
+	init_theta_60: DW 0
+	how_much_turn_60: DW 0
+	current_theta_60: DW 0
+	desired_degree_60: DW 0			
+	
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+Turn_Around_30: ; (IN PROGRESS)
+	OUT RESETPOS
+	IN     THETA
+	STORE init_theta_30
+	LOAD Deg30			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_30
+	
+	LOAD init_theta_30
+	ADD how_much_turn_30				
+	STORE desired_degree_30
+	
+Turn_Around_30_cont:	
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	SUB desired_degree_30 ; current_theta - desired_degree 
+	JPOS Turn_Around_30_return 
+	JUMP Turn_Around_30_cont
+	
+Turn_Around_30_return:
+	LOAD Zero
+	OUT RVELCMD
+	RETURN	
+	
+	
+	init_theta_30: DW 0
+	how_much_turn_30: DW 0
+	current_theta_30: DW 0
+	desired_degree_30: DW 0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+Turn_Around_15: ; (IN PROGRESS)
+	OUT RESETPOS
+	IN     THETA
+	STORE init_theta_15
+	LOAD Deg15			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_15
+	
+	LOAD init_theta_15
+	ADD how_much_turn_15				
+	STORE desired_degree_15
+	
+Turn_Around_15_cont:	
+	LOAD FSlow
+	OUT RVELCMD
+	
+	IN THETA
+	SUB desired_degree_15 ; current_theta - desired_degree 
+	JPOS Turn_Around_15_return 
+	JUMP Turn_Around_15_cont
+	
+Turn_Around_15_return:
+	LOAD Zero
+	OUT RVELCMD
+	RETURN	
+	
+	
+	init_theta_15: DW 0
+	how_much_turn_15: DW 0
+	current_theta_15: DW 0
+	desired_degree_15: DW 0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+
+MAW:	
+	OUT RESETPOS
+	LOAD	Ft1									; <------------------ Change this to alter the collision distance
+	STORE MAW_side
+	ADDI		100
+	STORE MAW_Collision_distance_continue
+	ADDI 	-50
+	STORE MAW_sideb
+	
+	LOAD   Mask2
+	OR	Mask3
+	OR 	Mask5
+	OUT    SONAREN
+
+		
+MAW_cont:
+	IN DIST5
+	STORE thex
+	OUT SSEG1
+	SUB MAW_sideb
+	OUT SSEG2
+	JZERO	GO
+	JPOS	Turn_Right_1
+	
+	LOAD 	thex
+	SUB	 	MAW_side
+	JZERO	GO
+	JPOS	GO
+	JNEG	Turn_Around_1
+	
+	JUMP 	MAW_cont
+
+GO:	IN DIST2 ;; checking it is in range of collision_distance
+	SUB MAW_Collision_distance_continue  ;if (DIST2 < Collision_distance) -> collision detected
+	JNEG MAW_Collision_detected_continue
+	IN DIST3
+	SUB MAW_Collision_distance_continue
+	JNEG MAW_Collision_detected_continue
+		
+	LOAD FSlow
+	OUT RVELCMD
+	OUT LVELCMD
+	IN XPOS
+	;OUT SSEG1
+	JUMP MAW_cont
+	
+MAW_Collision_detected_continue: ;; for now, turn 90 left
+	LOAD Zero
+	OUT LVELCMD
+	OUT RVELCMD
+	OUT SONAREN
+	RETURN
+	
+
+	MAW_Collision_distance_continue: DW 0
+	MAW_side: DW 0
+	MAW_sideb: DW 0
+	thex:	DW 0
+
+;;;;;;;;;;;
+
+Turn_Around_1: ; (IN PROGRESS)
+	OUT RESETPOS
+	IN     THETA
+	STORE init_theta_1
+	LOAD Deg3			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_1
+	LOAD init_theta_1
+	ADD how_much_turn_1			
+	STORE desired_degree_1
+	
+Turn_Around_1_cont:	
+	LOAD FSlow
+	OUT RVELCMD
+	LOAD FSlowneg
+	OUT LVELCMD
+	
+	IN THETA
+	SUB desired_degree_1 ; current_theta - desired_degree 
+	JPOS Turn_Around_1_return 
+	JZERO Turn_Around_1_return
+	JUMP Turn_Around_1_cont
+	
+Turn_Around_1_return:
+	LOAD Zero
+	OUT RVELCMD
+	OUT LVELCMD
+	JUMP GO	
+	
+	init_theta_1: DW 0
+	how_much_turn_1: DW 0
+	current_theta_1: DW 0
+	desired_degree_1: DW 0
+
+;;;;;;;;;;;;;;
+
+Turn_Right_1: ; (IN PROGRESS)
+	OUT RESETPOS
+	IN     THETA
+	STORE init_theta_1x
+	LOAD Deg3			;;       <-----------------change this to alter how much turn
+	STORE how_much_turn_1x
+	LOAD D360
+	SUB how_much_turn_1x	
+	STORE desired_degree_1x
+	
+Turn_Right_1_cont:	
+	LOAD FSlow
+	OUT LVELCMD
+	LOAD FSlowneg
+	OUT RVELCMD
+	
+	IN THETA
+	JZERO Turn_Right_1_cont
+	SUB desired_degree_1x
+	JPOS Turn_Right_1_cont
+	
+Turn_Right_1_return:
+	LOAD Zero
+	OUT LVELCMD
+	OUT RVELCMD
+	JUMP GO
+	
+	init_theta_1x: DW 0
+	how_much_turn_1x: DW 0
+	current_theta_1x: DW 0
+	desired_degree_1x: DW 0
+	
+
+;; need to implement "stabil/itzie"	
+		
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EDITED BY JUMONG ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		
+	
+	
+		
 ; FindClosest subroutine will go through the acquired data
 ; and return the angle of the closest sonar reading.
 FindClosest:
@@ -808,7 +1201,6 @@ I2CError:
 ;* Variables
 ;***************************************************************
 Temp:     DW 0 ; "Temp" is not a great name, but can be useful
-
 ;***************************************************************
 ;* Constants
 ;* (though there is nothing stopping you from writing to these)
@@ -843,14 +1235,24 @@ LowNibl:  DW &HF       ; 0000 0000 0000 1111
 ; some useful movement values
 OneMeter: DW 961       ; ~1m in 1.04mm units
 HalfMeter: DW 481      ; ~0.5m in 1.04mm units
+D360:	DW 360
+Ft1:	  DW 293
 Ft2:      DW 586       ; ~2ft in 1.04mm units
 Ft3:      DW 879
 Ft4:      DW 1172
+Deg1:	  DW 1
+Deg2:	  DW 2
+Deg3:	  DW 3
+Deg4:	  DW 4
+Deg15:	  DW 15
+Deg30:	  DW 30
+Deg60:    DW 60
 Deg90:    DW 90        ; 90 degrees in odometer units
 Deg180:   DW 180       ; 180
 Deg270:   DW 270       ; 270
 Deg360:   DW 360       ; can never actually happen; for math only
-FSlow:    DW 100       ; 100 is about the lowest velocity value that will move
+FSlow:    DW 150       ; 100 is about the lowest velocity value that will move
+FSlowneg:  DW -150
 RSlow:    DW -100
 FMid:     DW 350       ; 350 is a medium speed
 RMid:     DW -350
