@@ -104,7 +104,7 @@ TopLoop:
 	CALL   CheckThree
 	CALL   CheckFour
 	CALL   CheckRight ; uncomment to try this again
-	CALL   CheckDone
+	CALL   UpdateTheta
 	
 	
 	LOAD   flag
@@ -125,34 +125,55 @@ EnterKeepMoving:
 	OUT    BEEP        ; stop beeping
 KeepMoving:	
 	CALL   FlowerPetal
+	CALL   UpdateTheta
 	CALL   CheckTwo
 	CALL   CheckThree
 	CALL   CheckFour
-	CALL   CheckRight ; uncomment to try this again
-	CALL   CheckDone
+    CALL   CheckRight ; uncomment to try this again
+	CALL   CheckDoneTheta
 	JUMP   KeepMoving
 
 	; note that the movement API will still be running during this
 	; infinite loop, because it uses the timer interrupt.
 	;VARIABLES
-	shortDist: DW 400
-	rightDist: DW 150
+	shortDist: DW 700
+	rightDist: DW 400
 	finalNumb: DW 0
 	threeHunna: DW 300
 	threeThosa: DW 3000
 	fiveHunna:  DW 500
 	flag:       DW 0
-	
+	oneTen:     DW 110
+	oneSixty:	DW 160
+	oneThousa:  DW 1000
+	currentArcLength: DW 0
+	maxArc: DW 0 ; just for debugging
+	currentTheta:   DW 0
 	
 FlowerPetal:
 	LOAD FSlow
-	ADDI 80
+	ADDI 100
 	OUT  LVELCMD
 	LOAD FSlow
-	ADDI 60
+	ADDI 10
 	OUT  RVELCMD
 	RETURN	
 
+UpdateTheta:
+	IN THETA
+	XOR currentTheta
+	JZERO doneTheta
+	;else, update currTheta
+	IN THETA
+	STORE currentTheta
+contTheta:
+	LOAD currentArcLength
+	ADDI 1
+	STORE currentArcLength
+doneTheta:
+	RETURN
+	
+	; 150 and 10 was too steep of a petal
 CheckThree:
 	
 	IN     DIST3
@@ -163,14 +184,15 @@ endIt3:
 	LOAD   Zero
 	OUT    RVELCMD
 	OUT    LVELCMD
-	CALL   Turn_Around_90
+	CALL   Turn_Around_60
 	CALL   SetFlag	
+	LOAD   Zero
+	STORE  currentArcLength
 	RETURN
 	
 CheckTwo:
 	
 	IN     DIST2
-	OUT    SSEG2
 	SUB    shortDist ; dist3 - shortDist
 	JNEG   endIt4
 	RETURN
@@ -180,6 +202,8 @@ endIt4:
 	OUT    LVELCMD
 	CALL   Turn_Around_90
 	CALL   SetFlag	
+	LOAD   Zero
+	STORE  currentArcLength
 	RETURN
 	
 CheckRight:
@@ -189,8 +213,13 @@ CheckRight:
 	JNEG endIt
 	RETURN
 endIt:
+	LOAD   Zero
+	OUT    RVELCMD
+	OUT    LVELCMD
 	CALL Turn_Around_30
 	CALL   SetFlag
+	LOAD   Zero
+	STORE  currentArcLength
 	RETURN
 	
 CheckFour:
@@ -201,10 +230,13 @@ CheckFour:
 	RETURN
 endIt5:
 	LOAD   Zero
+	STORE  currentArcLength
 	OUT    RVELCMD
 	OUT    LVELCMD
-	CALL   Turn_Around_60	
+	CALL   Turn_Around_30	
 	CALL   SetFlag
+	LOAD   Zero
+	STORE  currentArcLength
 	RETURN
 
 SetFlag:
@@ -213,6 +245,20 @@ SetFlag:
 	STORE flag
 	RETURN
 
+	
+CheckDoneTheta:
+	LOAD  currentArcLength
+	SUB   oneSixty
+	JPOS  Stop
+	LOAD  currentArcLength
+	SUB   maxArc
+	JPOS  updateMax
+	RETURN
+updateMax:
+	LOAD  currentArcLength
+	STORE maxArc
+	OUT   SSEG2
+	RETURN
 	
 CheckDone:
 	; see if the last sonar to the right sonar 6 is 2700-3300
@@ -225,37 +271,42 @@ CheckDone:
 	OUT    SSEG2
 	SUB   threeThosa
 	CALL  Abs
-	SUB   threeHunna
+	SUB   fiveHunna
 	JPOS  Check5
 	LOAD  finalNumb
 	ADDI  1
 	STORE finalNumb
 Check5:
 	IN    DIST5
-	SUB   fiveHunna
-	JPOS  Check3
+	SUB   oneThousa
+;	JPOS  Check3
+	JPOS  UpdateSseg ; comment out to include Check3
 	LOAD  finalNumb
 	ADDI  1
 	STORE finalNumb
-Check3:
-	IN    DIST3
-	SUB   fiveHunna
-	JPOS  UpdateSseg
-	LOAD  finalNumb
-	ADDI  1
-	STORE finalNumb
+;Check3:
+;	IN    DIST3
+;	SUB   oneThousa
+;	JPOS  UpdateSseg
+;	LOAD  finalNumb
+;	ADDI  1
+;	STORE finalNumb
 UpdateSseg:
 	LOAD  finalNumb
 	OUT   SSEG1
-	LOAD  Three
+	LOAD  Two
 	SUB   finalNumb
 	JZERO Stop
 	RETURN
 
 Stop:
+	LOADI  &H20
+	OUT    BEEP 
 	LOAD Zero
 	OUT  LVELCMD
 	OUT  RVELCMD
+	LOAD currentArcLength
+	OUT  SSEG2
 	JUMP Stop
 
 	
