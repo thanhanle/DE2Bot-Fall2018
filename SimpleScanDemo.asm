@@ -23,7 +23,7 @@ Init:
 	STORE  DVel        ; Reset API variables
 	STORE  DTheta
 	OUT    SONAREN     ; Disable sonar (optional)
-	OUT    BEEP        ; Stop any beeping (optional)
+	OUT    BEEP        ; any beeping (optional)
 	
 	CALL   SetupI2C    ; Configure the I2C to read the battery voltage
 	CALL   BattCheck   ; Get battery voltage (and end if too low).
@@ -104,7 +104,7 @@ TopLoop:
 	CALL   CheckThree
 	CALL   CheckFour
 	CALL   CheckRight ; uncomment to try this again
-	CALL   UpdateTheta
+	;CALL   UpdateTheta
 	
 	
 	LOAD   flag
@@ -136,15 +136,15 @@ KeepMoving:
 	; note that the movement API will still be running during this
 	; infinite loop, because it uses the timer interrupt.
 	;VARIABLES
-	shortDist: DW 700
-	rightDist: DW 400
+	shortDist: DW 800
+	rightDist: DW 500
 	finalNumb: DW 0
 	threeHunna: DW 300
 	threeThosa: DW 3000
 	fiveHunna:  DW 500
 	flag:       DW 0
 	oneTen:     DW 110
-	oneSixty:	DW 160
+	oneSixty:	DW 140
 	oneThousa:  DW 1000
 	currentArcLength: DW 0
 	maxArc: DW 0 ; just for debugging
